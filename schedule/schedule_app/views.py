@@ -65,37 +65,37 @@ class RegisterView(APIView):
 
     # authentication_classes = []
     def get(self, request, *args, **kwargs):  # 发送邮箱验证码
-        ret = dict()
-        email = request._request.GET.get("email", None)
         try:
-            user=models.Users.objects.filter(pk=email).first()
-            if not user:
-                # 为用户登录创建验证码
-                checkcode = md5(email)[:5]
-                # 将验证码保存在session中
-                request._request.session["checkcode"] = checkcode
-                request._request.session.set_expiry(300)
-                # 发送邮件
-                title = "乐学课程表注册"
-                msg = "您好！感谢您注册乐学课程表，这是您本次注册使用的验证码 " + checkcode + " ,该验证码将在5分钟后过期，如过期请重新点击发送，获得新的验证码"
-                email_from = settings.DEFAULT_FROM_EMAIL
-                reciever = [
-                    email,
-                ]
-                # 发送邮件
-                send_mail(title, msg, email_from, reciever)
-                ret["code"] = 1000
-                ret["msg"] = "成功发送验证码"
-
-                return Response(ret, status.HTTP_200_OK)
+            ret = dict()
+            email = request._request.GET.get("email", None)
+            # 为用户登录创建验证码
+            checkcode = md5(email)[:5]
+            # 将验证码保存在数据库中(这里原本是保存在session中，但因为前端一直调用失败，暂时改为保存在数据库表中）
+            checkcode_obj = models.checkcode.objects.filter(email=email).first()
+            # 若未有相关记录则创建，若已有相关记录则更新
+            if not checkcode_obj:
+                new_checkcode = models.checkcode()
+                new_checkcode.email = email
+                new_checkcode.code = checkcode
+                new_checkcode.save()
             else:
-                ret["code"]=1001
-                ret["msg"]="该邮箱已注册过"
-                return Response(ret,status.HTTP_200_OK)
-        except:
-            ret["code"]=1002
-            ret["msg"]="该邮箱为无效邮箱"
-            return Response(ret,status.HTTP_200_OK)
+                checkcode_obj.code = checkcode
+                checkcode_obj.save()
+            # 发送邮件
+            title = "晓声APP注册"
+            msg = "您好！感谢您注册晓声APP，这是您本次注册使用的验证码 " + checkcode + " ,该验证码将在5分钟后过期，如过期请重新点击发送，获得新的验证码"
+            email_from = settings.DEFAULT_FROM_EMAIL
+            reciever = [
+                email,
+            ]
+            # 发送邮件
+            send_mail(title, msg, email_from, reciever)
+            ret["code"] = 1000
+            ret["msg"] = "成功发送验证码"
+
+            return Response(ret, status.HTTP_200_OK)
+        except Exception as e:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self, request, *args, **kwargs):  # 注册
 
@@ -104,32 +104,52 @@ class RegisterView(APIView):
             email = request._request.POST.get("email", None)
             user_password = request._request.POST.get("user_pwd", None)
             checkcode = request._request.POST.get("checkcode", None)
+            name = request._request.POST.get("name", None)
+            time_now = datetime.datetime.now()
+            interval = datetime.timedelta(hours=8, minutes=5)  # 时间格式问题 UTC比当地时间少8个小时，minutes是设置验证码时效为5分钟
+            time_early = time_now - interval
+            time_now = time_now - datetime.timedelta(hours=8)
 
-            if checkcode != request._request.session["checkcode"]:
-                ret["code"] = 1002
-                ret["msg"] = "验证码错误"
+            checkcode_obj = models.checkcode.objects.filter(email=email).first()
+            if not checkcode_obj:
+                ret["code"] = 1003
+                ret["msg"] = "该邮箱未申请过验证码"
                 return Response(ret, status.HTTP_200_OK)
             else:
-                db_search = models.Users.objects.filter(email=email).first()
-                if db_search == None:
-                    temp = models.Users()
-                    temp.email = email
-                    temp.password = user_password
-                    temp.save()
-                    ret["code"] = 1000
-                    ret["msg"] = "成功注册"
-                    ret["email"]=temp.email
-                    ret["user_pwd"]=temp.password
+                new_checkcode_obj = models.checkcode.objects.filter(email=email,
+                                                                    update_time__range=(time_early, time_now)).first()
 
+                if not new_checkcode_obj:
+                    ret["code"] = 1004
+                    ret["msg"] = "验证码已过期，请重新获取"
                     return Response(ret, status.HTTP_200_OK)
                 else:
-                    ret["code"] = 1001
-                    ret["msg"] = "用户已存在"
-                    return Response(ret, status.HTTP_200_OK)
+                    correct_checkcode = new_checkcode_obj.code
+                    if correct_checkcode == checkcode:
+                        db_search = models.Users.objects.filter(email=email).first()
+                        if db_search == None:
+                            temp = models.Users()
+                            temp.email = email
+                            temp.password = user_password
+                            temp.name = name
+                            temp.save()
+                            ret["code"] = 1000
+                            ret["msg"] = "成功注册"
+                            ret["email"] = temp.email
+                            ret["user_pwd"] = temp.password
+                            ret["user_name"] = temp.name
+                            return Response(ret, status.HTTP_200_OK)
+                        else:
+                            ret["code"] = 1001
+                            ret["msg"] = "用户已存在"
+                            return Response(ret, status.HTTP_200_OK)
+                    else:
+                        ret["code"] = 1002
+                        ret["msg"] = "验证码错误"
+                        return Response(ret, status.HTTP_200_OK)
+
         except:
-            ret["code"]=1003
-            ret["msg"]="验证码已失效"
-            return Response(ret,status.HTTP_200_OK)
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserView(APIView):
@@ -181,9 +201,9 @@ class PostView(APIView):
     对帖子的相关操作
     """
 
-    def post(self, request, *args, **kwargs):  # 创建帖子或删除帖子
+    def post(self, request, *args, **kwargs):  # 创建帖子或删除帖子或给帖子点赞或取消赞
 
-        # try:
+        try:
             method = request._request.POST.get("method", None)
             if method == "create":  # 创建帖子
                 course_id = request._request.POST.get("course_id", None)
@@ -249,7 +269,7 @@ class PostView(APIView):
                         "msg": "该帖子不存在"
                     }
                     return Response(res, status.HTTP_200_OK)
-            else:#给该帖子点赞
+            elif method=="like":#给该帖子点赞
                 post_id=request._request.POST.get("post_id",None)
                 post=models.Post.objects.get(pk=post_id)
                 post.like_num=post.like_num+1
@@ -262,9 +282,10 @@ class PostView(APIView):
                 }
 
                 return Response(res,status.HTTP_200_OK)
-        #
-        # except:
-        #     return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+        except:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request, *args, **kwargs):  # 得到所有帖子信息
         try:
@@ -339,35 +360,55 @@ class MessageView(APIView):
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def post(self, request, *args, **kwargs):  # 对某个帖子新加回复
+    def post(self, request, *args, **kwargs):  # 对某个帖子新加回复,或删除回复
+
         try:
-            post_id = request._request.POST.get("post_id", None)
-            content = request._request.POST.get("content", None)
-            email = request._request.POST.get("email", None)
+            method = request._request.POST.get("method", None)
+            if method=="create":#添加回复
 
-            user = models.Users.objects.get(pk=email)
-            post = models.Post.objects.get(pk=post_id)
-            post.reply_num=post.reply_num+1
-            post.save()
-            message = models.Message()
-            message.content = content
-            message.send_time = datetime.datetime.now()
-            message.sender = user
-            message.post = post
-            message.save()
+                post_id = request._request.POST.get("post_id", None)
+                content = request._request.POST.get("content", None)
+                email = request._request.POST.get("email", None)
 
-            # 序列化
-            ser = serializers.MessageSerializers(instance=message, many=False)
+                user = models.Users.objects.get(pk=email)
+                post = models.Post.objects.get(pk=post_id)
+                post.reply_num=post.reply_num+1
+                post.save()
+                message = models.Message()
+                message.content = content
+                message.send_time = datetime.datetime.now()
+                message.sender = user
+                message.post = post
+                message.save()
 
-            # 在返回字典里增添新信息
-            ret = {
-                "code": 1000,
-                "msg": "添加回复成功",
-            }
-            result = dict(ret, **ser.data)
+                # 序列化
+                ser = serializers.MessageSerializers(instance=message, many=False)
 
-            return Response(result, status.HTTP_200_OK)
+                # 在返回字典里增添新信息
+                ret = {
+                    "code": 1000,
+                    "msg": "添加回复成功",
+                }
+                result = dict(ret, **ser.data)
 
+                return Response(result, status.HTTP_200_OK)
+
+            else:#删除回复
+                message_id = request._request.POST.get("message_id", None)
+                message = models.Message.objects.filter(pk=message_id).first()
+                if message != None:
+                    message.delete()
+                    res = {
+                        "code": 1000,
+                        "msg": "成功删除该回复"
+                    }
+                    return Response(res, status.HTTP_200_OK)
+                else:
+                    res = {
+                        "code": 1001,
+                        "msg": "该回复不存在"
+                    }
+                    return Response(res, status.HTTP_200_OK)
 
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
