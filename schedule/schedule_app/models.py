@@ -106,3 +106,13 @@ class Photo(models.Model):
 
     class Meta:
         db_table = "photo"
+
+
+class checkcode(models.Model):
+    class Meta:
+        db_table = "checkcode"
+
+    email = models.CharField(max_length=30,primary_key=True)
+    code = models.CharField(max_length=10)
+    create_time = models.DateTimeField(auto_now_add=True, null=True)
+    update_time = models.DateTimeField(auto_now=True, null=True)
