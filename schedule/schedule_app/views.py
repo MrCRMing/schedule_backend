@@ -3,12 +3,11 @@ import hashlib
 from django.shortcuts import render
 from rest_framework.views import APIView
 from . import models, serializers
-from rest_framework.response import Response
 from rest_framework import status
 from schedule import settings
 from rest_framework.response import Response
 from django.core.mail import send_mail
-
+import json
 
 import time
 import datetime
@@ -210,6 +209,7 @@ class PostView(APIView):
                 email = request._request.POST.get("email", None)
                 question = request._request.POST.get("question", None)
                 image_num = request._request.POST.get("image_num", 0)
+                file_num = request._request.POST.get("file_num", 0)
 
                 date = datetime.date.today().strftime("%Y/%m/%d/")
                 # 创建帖子
@@ -244,6 +244,26 @@ class PostView(APIView):
 
                         image.save()
 
+
+                if (int(file_num) != 0): # for file
+                    for i in range(1,int(file_num)+1):
+                        # 创建图片，并与该帖子进行绑定
+                        key="file_"+str(i)
+                        file_physical = request.FILES[key]
+                        file = models.File(file=file_physical)
+                        fileName = str(file.file.name)
+                        locations = str(fileName).find(".")
+                        extension = fileName[locations:]
+                        name = fileName[:locations]
+                        namestring = name + str(time.time())
+                        md5 = hashlib.md5(namestring.encode('utf-8')).hexdigest()
+                        file.file.name = md5[:10] + extension
+                        file.post = post
+                        file.url = "http://" + settings.HOST + ":" + settings.PORT + "/media/file/" + date + file.file.name
+
+                        file.save()
+
+
                 # 序列化
                 ser = serializers.PostSerializers(instance=post, many=False)
                 res = {
@@ -254,15 +274,24 @@ class PostView(APIView):
                 return Response(result, status.HTTP_200_OK)
 
             elif method=="delete":  # 删除帖子
+                email = request.POST.get("email", None)
                 post_id = request._request.POST.get("post_id", None)
                 post = models.Post.objects.filter(pk=post_id).first()
                 if post!=None:
-                    post.delete()
-                    res = {
-                        "code": 1000,
-                        "msg": "成功删除该帖子"
-                    }
-                    return Response(res, status.HTTP_200_OK)
+                    if post.creator_id == email:
+                        post.delete()
+                        res = {
+                            "code": 1000,
+                            "msg": "成功删除该帖子"
+                        }
+                        return Response(res, status.HTTP_200_OK)
+                    else:
+                        res = {
+                            "code": 1002,
+                            "msg": "无权限，删除失败"
+                        }
+                        return Response(res, status.HTTP_200_OK)
+
                 else:
                     res = {
                         "code": 1001,
@@ -279,6 +308,18 @@ class PostView(APIView):
                     "code":1000,
                     "msg":"点赞成功",
                     "like_num":post.like_num
+                }
+
+            elif method=='unlike':#取消点赞
+                post_id = request._request.POST.get("post_id", None)
+                post = models.Post.objects.get(pk=post_id)
+                post.like_num = post.like_num - 1
+                post.save()
+
+                res = {
+                    "code": 1000,
+                    "msg": "取消点赞成功",
+                    "like_num": post.like_num
                 }
 
                 return Response(res,status.HTTP_200_OK)
@@ -369,6 +410,9 @@ class MessageView(APIView):
                 post_id = request._request.POST.get("post_id", None)
                 content = request._request.POST.get("content", None)
                 email = request._request.POST.get("email", None)
+                image_num = request._request.POST.get("image_num", 0)
+                file_num = request._request.POST.get("file_num", 0)
+                date = datetime.date.today().strftime("%Y/%m/%d/")
 
                 user = models.Users.objects.get(pk=email)
                 post = models.Post.objects.get(pk=post_id)
@@ -380,7 +424,42 @@ class MessageView(APIView):
                 message.sender = user
                 message.post = post
                 message.save()
+                # 判断是否上传图片
+                if (int(image_num) != 0):
+                    for i in range(1, int(image_num) + 1):
+                        # 创建图片，并与该帖子进行绑定
+                        key = "image_" + str(i)
+                        img = request.FILES[key]
+                        image = models.Image(image=img)
+                        imageName = str(image.image.name)
+                        locations = str(imageName).find(".")
+                        extension = imageName[locations:]
+                        name = imageName[:locations]
+                        namestring = name + str(time.time())
+                        md5 = hashlib.md5(namestring.encode('utf-8')).hexdigest()
+                        image.image.name = md5[:10] + extension
+                        image.message=message
+                        image.url = "http://" + settings.HOST + ":" + settings.PORT + "/media/image/" + date + image.image.name
 
+                        image.save()
+
+                if (int(file_num) != 0):  # for file
+                    for i in range(1, int(file_num) + 1):
+                        # 创建图片，并与该帖子进行绑定
+                        key = "file_" + str(i)
+                        file_physical = request.FILES[key]
+                        file = models.File(file=file_physical)
+                        fileName = str(file.file.name)
+                        locations = str(fileName).find(".")
+                        extension = fileName[locations:]
+                        name = fileName[:locations]
+                        namestring = name + str(time.time())
+                        md5 = hashlib.md5(namestring.encode('utf-8')).hexdigest()
+                        file.file.name = md5[:10] + extension
+                        file.message=message
+                        file.url = "http://" + settings.HOST + ":" + settings.PORT + "/media/file/" + date + file.file.name
+
+                        file.save()
                 # 序列化
                 ser = serializers.MessageSerializers(instance=message, many=False)
 
@@ -393,15 +472,28 @@ class MessageView(APIView):
 
                 return Response(result, status.HTTP_200_OK)
 
-            else:#删除回复
+            elif method == "delete":#删除回复
+                email = request.POST.get("email",None)
                 message_id = request._request.POST.get("message_id", None)
                 message = models.Message.objects.filter(pk=message_id).first()
                 if message != None:
-                    message.delete()
-                    res = {
-                        "code": 1000,
-                        "msg": "成功删除该回复"
-                    }
+                    if message.sender_id == email:
+                        post = models.Post.objects.filter(id=message.post_id).first()
+                        post.reply_num = post.reply_num - 1
+                        post.save()
+                        message.delete()
+                        res = {
+                            "code": 1000,
+                            "msg": "成功删除该回复"
+                        }
+                        return Response(res, status.HTTP_200_OK)
+                    else:
+                        res = {
+                            "code": 1002,
+                            "msg": "无权限，删除失败"
+                        }
+                        return Response(res, status.HTTP_200_OK)
+
                     return Response(res, status.HTTP_200_OK)
                 else:
                     res = {
@@ -418,11 +510,17 @@ class LessonView(APIView):
     对课程的相关操作
     """
     def get(self, request, *args, **kwargs):  # 得到该用户的所有课程信息
-         try:
-            email=request._request.GET.get("email",None)
 
+            email=request._request.GET.get("email",None)
+            year = request.GET.get("year",None)
+            semester = request.GET.get("semester",None)
             user=models.Users.objects.get(pk=email)
             lesson_list=user.lesson_set.all()
+            if year is not None:
+                lesson_list = lesson_list.filter(year=year)
+            if semester is not None:
+                lesson_list=lesson_list.filter(semester=semester)
+
             if len(lesson_list):
                 #序列化
                 ser=serializers.LessonSerializers(instance=lesson_list,many=True)
@@ -447,62 +545,98 @@ class LessonView(APIView):
                 res["msg"] = "该用户尚未上传过课程"
                 return Response(res, status.HTTP_200_OK)
 
-         except:
-            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self,request,*args,**kwargs): #添加新的课程信息
-        try:
-            email = request._request.POST.get("email", None)
-            lesson_num=request._request.POST.get("lesson_num",None)
-            user = models.Users.objects.get(pk=email)
-            universiy=user.university
-            major=user.major
 
-            for i in range(1,int(lesson_num)+1):
-                key_course_name="course_name_"+str(i)
-                key_week_num="week_num_"+str(i)
-                key_weekday="weekday_"+str(i)
-                key_class_num="class_num_"+str(i)
-                key_teacher="teacher_"+str(i)
-                key_classroom="classroom_"+str(i)
-                #从POST中取出数据
-                course_name=request._request.POST.get(key_course_name,None)
-                week_num=request._request.POST.get(key_week_num,None)
-                weekday=request._request.POST.get(key_weekday,None)
-                class_num=request._request.POST.get(key_class_num,None)
-                teacher=request._request.POST.get(key_teacher,None)
-                classroom=request._request.POST.get(key_classroom,None)
-                #创建lesson对象
-                lesson=models.Lesson()
-                lesson.week_num=week_num
-                lesson.weekday=weekday
-                lesson.class_num=class_num
-                lesson.teacher=teacher
-                lesson.classroom=classroom
-                #为该课程指定用户
-                lesson.user=user
-                #为该课程指定course,如果数据库中已有该course则直接建立联系，若没有则新建course
-                course_obj=models.Course.objects.filter(course_name=course_name,university=universiy,major=major).first()
+        try:
+            email = request.data.get("email", None)
+            user = models.Users.objects.get(pk=email)
+            universiy = user.university
+            major = user.major
+            if request.content_type.startswith("application/json"):
+                lesson_list = request.data.get("lesson_list", None)
+            elif request.content_type.startswith("multipart/form-data"):
+                lesson_list_temp = request.POST.getlist("lesson_list", [])
+                lesson_list = []
+                for item in lesson_list_temp:
+                    lesson_list.append(json.loads(item))
+            else:
+                print(3)
+
+            for lesson_in_list in lesson_list:
+                course_name = lesson_in_list.get("course_name",None)
+                lesson = models.Lesson()
+                lesson.year = lesson_in_list.get("year", None)
+                lesson.semester = lesson_in_list.get("semester", None)
+                lesson.day_of_week = lesson_in_list.get("day_of_week", None)
+                lesson.week_begin = lesson_in_list.get("week_begin", None)
+                lesson.week_end = lesson_in_list.get("week_end", None)
+                lesson.day_slot = lesson_in_list.get("day_slot", None)
+                lesson.teacher = lesson_in_list.get("teacher", None)
+                lesson.classroom = lesson_in_list.get("classroom", None)
+                lesson.description = lesson_in_list.get("description", None)
+                # 为该课程指定用户
+                lesson.user = user
+                # 为该课程指定course,如果数据库中已有该course则直接建立联系，若没有则新建course
+                course_obj = models.Course.objects.filter(course_name=course_name, university=universiy,
+                                                          major=major).first()
                 if not course_obj:
-                    course=models.Course()
-                    course.course_name=course_name
-                    course.university=universiy
-                    course.major=major
+                    course = models.Course()
+                    course.course_name = course_name
+                    course.university = universiy
+                    course.major = major
                     course.save()
-                    lesson.course=course
+                    lesson.course = course
                     lesson.save()
                 else:
-                    lesson.course=course_obj
+                    lesson.course = course_obj
                     lesson.save()
 
-            #返回操作信息，暂不考虑将新添的lesson信息返回
-            res={
-                "code":1000,
-                "msg":"上传成功"
+            # 返回操作信息，暂不考虑将新添的lesson信息返回
+
+            res = {
+                "code": 1000,
+                "msg": "上传成功"
             }
-            return Response(res,status.HTTP_200_OK)
+            return Response(res, status.HTTP_200_OK)
 
         except:
+           return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def delete(self, request, *args, **kwargs):# 根据id删除的课程信息
+        try:
+            email = request.data.get("email", None)
+
+            lesson_id = request.data.get("lesson_id", None)
+            lesson = models.Lesson.objects.filter(pk=lesson_id).first()
+
+            if lesson != None:
+                if lesson.user_id == email:
+                    lesson.delete()
+                    res = {
+                        "code": 1000,
+                        "msg": "成功删除该课程"
+                    }
+                    return Response(res, status.HTTP_200_OK)
+                else:
+                    res = {
+                        "code": 1002,
+                        "msg": "无权限，删除失败"
+                    }
+                    return Response(res, status.HTTP_200_OK)
+            else:
+                res = {
+                    "code": 1001,
+                    "msg": "该课程不存在"
+                }
+                return Response(res, status.HTTP_200_OK)
+
+
+
+        except:
+
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 

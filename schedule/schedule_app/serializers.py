@@ -10,7 +10,7 @@ class PostSerializers(serializers.Serializer):
     course_id = serializers.IntegerField(source="course.id")  # 正向获取外键的信息
     creator = serializers.SerializerMethodField()  # 自定义显示，正向获取外键的信息
     content_images = serializers.SerializerMethodField()  # 自定义显示，反向获取外键的信息
-
+    content_files = serializers.SerializerMethodField()# 自定义显示，反向获取外键的信息
     def get_creator(self, row):
         res = dict()
         res["email"] = row.creator.email
@@ -28,6 +28,13 @@ class PostSerializers(serializers.Serializer):
             res.append(item.url)
         return res
 
+    def get_content_files(self, row):
+        res = []
+        file_list = row.file_set.all()
+        for item in file_list:
+            res.append(item.url)
+        return res
+
 
 class MessageSerializers(serializers.Serializer):
     post_id = serializers.IntegerField(source="post.id")
@@ -35,6 +42,8 @@ class MessageSerializers(serializers.Serializer):
     content = serializers.CharField()
     send_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')  # 格式时间输出
     sender = serializers.SerializerMethodField()  # 自定义显示，正向获取外键的信息
+    content_images = serializers.SerializerMethodField()  # 自定义显示，反向获取外键的信息
+    content_files = serializers.SerializerMethodField()  # 自定义显示，反向获取外键的信息
 
     def get_sender(self, row):
         res = dict()
@@ -46,15 +55,33 @@ class MessageSerializers(serializers.Serializer):
         res["photo_url"] = row.sender.photo.url
         return res
 
+    def get_content_images(self, row):
+        res = []
+        image_list = row.image_set.all()
+        for item in image_list:
+            res.append(item.url)
+        return res
+
+    def get_content_files(self, row):
+        res = []
+        file_list = row.file_set.all()
+        for item in file_list:
+            res.append(item.url)
+        return res
+
 
 class LessonSerializers(serializers.Serializer):
-    course_id=serializers.CharField(source="course.id")
-    course_name = serializers.CharField(source="course.course_name")
-    week_num = serializers.CharField()
-    weekday = serializers.CharField()
-    class_num = serializers.CharField()
+    lesson_id = serializers.IntegerField(source="id")
+    year = serializers.IntegerField()
+    semester = serializers.IntegerField()
+    week_num = serializers.IntegerField()
+    day_of_week = serializers.IntegerField()
+    day_slot = serializers.CharField()
     teacher = serializers.CharField()
     classroom = serializers.CharField()
+    description = serializers.CharField()
+    course_id=serializers.CharField(source="course.id")
+    course_name = serializers.CharField(source="course.course_name")
 
 
 

@@ -9,5 +9,6 @@ urlpatterns = [
     url(r'^api/v1/post/$',views.PostView.as_view(),name='post'),
     url(r'^api/v1/message/$',views.MessageView.as_view(),name='message')
 
+
 ]
 
