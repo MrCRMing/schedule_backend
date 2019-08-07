@@ -54,8 +54,8 @@ class Lesson(models.Model):
 
     year = models.IntegerField(null=True)
     semester = models.IntegerField(null=True)
-    week_begin = models.IntegerField(null=True)
-    week_end = models.IntegerField(null=True)
+    week_num = models.CharField(max_length=64,null=True)
+
     day_of_week = models.IntegerField(null=True)
     day_slot = models.CharField(max_length=20)
     teacher = models.CharField(max_length=20)

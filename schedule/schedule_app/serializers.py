@@ -71,11 +71,12 @@ class MessageSerializers(serializers.Serializer):
 
 
 class LessonSerializers(serializers.Serializer):
+    lesson_id = serializers.IntegerField(source="id")
     year = serializers.IntegerField()
     semester = serializers.IntegerField()
-    week_begin = serializers.IntegerField()
-    week_end = serializers.IntegerField()
+    week_num = serializers.IntegerField()
     day_of_week = serializers.IntegerField()
+    day_slot = serializers.CharField()
     teacher = serializers.CharField()
     classroom = serializers.CharField()
     description = serializers.CharField()

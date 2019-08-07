@@ -510,7 +510,7 @@ class LessonView(APIView):
     对课程的相关操作
     """
     def get(self, request, *args, **kwargs):  # 得到该用户的所有课程信息
-         try:
+
             email=request._request.GET.get("email",None)
             year = request.GET.get("year",None)
             semester = request.GET.get("semester",None)
@@ -545,8 +545,6 @@ class LessonView(APIView):
                 res["msg"] = "该用户尚未上传过课程"
                 return Response(res, status.HTTP_200_OK)
 
-         except:
-            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self,request,*args,**kwargs): #添加新的课程信息
 
