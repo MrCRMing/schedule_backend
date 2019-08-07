@@ -5,14 +5,18 @@ import datetime, os
 def get_image_path(instance, filename):
     date = datetime.datetime.now().strftime("%Y-%m-%d")
     year, month, day = date.split("-")
-
     return os.path.join("image", year, month, day, filename)
+
+
+def get_file_path(instance, filename):
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
+    year, month, day = date.split("-")
+    return os.path.join("file", year, month, day, filename)
 
 
 def get_photo_path(instance, filename):
     date = datetime.datetime.now().strftime("%Y-%m-%d")
     year, month, day= date.split("-")
-
     return os.path.join("photo", year, month, day, filename)
 
 
@@ -48,11 +52,15 @@ class Lesson(models.Model):
     class Meta:
         db_table = "lesson"
 
-    week_num = models.CharField(max_length=20)
-    weekday = models.CharField(max_length=20)
-    class_num = models.CharField(max_length=20)
+    year = models.IntegerField(null=True)
+    semester = models.IntegerField(null=True)
+    week_begin = models.IntegerField(null=True)
+    week_end = models.IntegerField(null=True)
+    day_of_week = models.IntegerField(null=True)
+    day_slot = models.CharField(max_length=20)
     teacher = models.CharField(max_length=20)
     classroom = models.CharField(max_length=20)
+    description = models.CharField(max_length=128, null=True)
 
     # 指定外键
     course = models.ForeignKey("Course", on_delete=None)
@@ -85,6 +93,7 @@ class Message(models.Model):
     post = models.ForeignKey("Post", on_delete=models.CASCADE)
 
 
+
 class Image(models.Model):
     url = models.TextField(null=True)
     image = models.ImageField(upload_to=get_image_path)
@@ -92,10 +101,25 @@ class Image(models.Model):
     update_time = models.DateTimeField(auto_now=True, null=True)
 
     # 建立外键
-    post = models.ForeignKey("Post", on_delete=models.CASCADE)
+    post = models.ForeignKey("Post", on_delete=models.CASCADE, null=True)
+    message = models.ForeignKey("Message", on_delete=models.CASCADE, null=True)
 
     class Meta:
         db_table = "image"
+
+
+class File(models.Model):
+    url = models.TextField(null=True)
+    file = models.FileField(upload_to=get_file_path)
+    create_time = models.DateTimeField(auto_now_add=True, null=True)
+    update_time = models.DateTimeField(auto_now=True, null=True)
+
+    # 建立外键
+    post = models.ForeignKey("Post", on_delete=models.CASCADE, null=True)
+    message = models.ForeignKey("Message", on_delete=models.CASCADE, null=True)
+
+    class Meta:
+        db_table = "file"
 
 
 class Photo(models.Model):
@@ -116,3 +140,4 @@ class checkcode(models.Model):
     code = models.CharField(max_length=10)
     create_time = models.DateTimeField(auto_now_add=True, null=True)
     update_time = models.DateTimeField(auto_now=True, null=True)
+
