@@ -322,6 +322,9 @@ class PostView(APIView):
                     "like_num": post.like_num
                 }
 
+            else:
+                return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
                 return Response(res,status.HTTP_200_OK)
 
 
@@ -501,6 +504,8 @@ class MessageView(APIView):
                         "msg": "该回复不存在"
                     }
                     return Response(res, status.HTTP_200_OK)
+            else:
+                return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -604,7 +609,48 @@ class LessonView(APIView):
         except:
            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def delete(self, request, *args, **kwargs):# 根据id删除的课程信息
+    def put(self, request, *args, **kwargs):# 根据id删除的课程信息
+        try:
+            email = request.data.get("email", None)
+
+            lesson_id = request.data.get("lesson_id", None)
+            lesson = models.Lesson.objects.filter(pk=lesson_id).first()
+
+            if lesson != None:
+                if lesson.user_id == email:
+                    lesson.year = request.data.get("year", lesson.year)
+                    lesson.semester = request.data.get("semester", lesson.semester)
+                    lesson.day_of_week = request.data.get("day_of_week", lesson.day_of_week)
+                    lesson.week_num = request.data.get("week_num", lesson.week_num)
+                    lesson.day_slot = request.data.get("day_slot", lesson.day_slot)
+                    lesson.teacher = request.data.get("teacher", lesson.teacher)
+                    lesson.classroom = request.data.get("classroom", lesson.classroom)
+                    lesson.description = request.data.get("description", lesson.description)
+                    lesson.save()
+                    res = {
+                        "code": 1000,
+                        "msg": "成功修改该课程"
+                    }
+                    return Response(res, status.HTTP_200_OK)
+                else:
+                    res = {
+                        "code": 1002,
+                        "msg": "无权限，修改失败"
+                    }
+                    return Response(res, status.HTTP_200_OK)
+            else:
+                res = {
+                    "code": 1001,
+                    "msg": "该课程不存在"
+                }
+                return Response(res, status.HTTP_200_OK)
+
+        except:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+    def delete(self, request, *args, **kwargs):
         try:
             email = request.data.get("email", None)
 
@@ -632,12 +678,6 @@ class LessonView(APIView):
                 }
                 return Response(res, status.HTTP_200_OK)
 
-
-
         except:
-
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
 
