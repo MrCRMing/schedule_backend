@@ -618,6 +618,10 @@ class LessonView(APIView):
 
             if lesson != None:
                 if lesson.user_id == email:
+                    user = models.Users.objects.get(pk=email)
+                    universiy = user.university
+                    major = user.major
+                    course_name = request.data.get("course_name",models.Course.objects.get(pk=lesson.course_id).course_name)
                     lesson.year = request.data.get("year", lesson.year)
                     lesson.semester = request.data.get("semester", lesson.semester)
                     lesson.day_of_week = request.data.get("day_of_week", lesson.day_of_week)
@@ -626,11 +630,29 @@ class LessonView(APIView):
                     lesson.teacher = request.data.get("teacher", lesson.teacher)
                     lesson.classroom = request.data.get("classroom", lesson.classroom)
                     lesson.description = request.data.get("description", lesson.description)
-                    lesson.save()
+
+                    if course_name != models.Course.objects.get(pk=lesson.course_id).course_name:
+                        course_obj = models.Course.objects.filter(course_name=course_name, university=universiy,
+                                                                  major=major).first()
+                        if not course_obj:
+                            course = models.Course()
+                            course.course_name = course_name
+                            course.university = universiy
+                            course.major = major
+                            course.save()
+                            lesson.course = course
+                            lesson.save()
+                        else:
+                            lesson.course = course_obj
+                            lesson.save()
+                    else:
+                        lesson.save()
                     res = {
                         "code": 1000,
-                        "msg": "成功修改该课程"
+                        "msg": "成功修改该课程",
+                        "course": serializers.LessonSerializers(instance=lesson, many=False).data
                     }
+
                     return Response(res, status.HTTP_200_OK)
                 else:
                     res = {
