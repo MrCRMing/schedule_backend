@@ -570,6 +570,9 @@ class LessonView(APIView):
             else:
                 print(3)
 
+            lesson_id_list = []
+            course_id_list = []
+
             for lesson_in_list in lesson_list:
                 course_name = lesson_in_list.get("course_name",None)
                 lesson = models.Lesson()
@@ -597,12 +600,16 @@ class LessonView(APIView):
                 else:
                     lesson.course = course_obj
                     lesson.save()
-
+                lesson_id_list.append(lesson.id)
+                course_id_list.append(lesson.course_id)
             # 返回操作信息，暂不考虑将新添的lesson信息返回
 
             res = {
                 "code": 1000,
-                "msg": "上传成功"
+                "msg": "上传成功",
+                "lesson_id_list":lesson_id_list,
+                "course_id_list":course_id_list
+
             }
             return Response(res, status.HTTP_200_OK)
 
