@@ -194,6 +194,22 @@ class UserView(APIView):
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def get(self, request, *args, **kwargs):  # 获得用户信息
+        ret = {"code": 1000, "msg": None}
+        try:
+            email = request._request.GET.get("email", None)
+
+            # 修改用户信息
+            user = models.Users.objects.get(pk=email)
+            ser = serializers.UserSerializers(instance=user, many=False)
+            ret["code"] = 1000
+            ret["msg"] = "获取用户信息成功"
+            result = dict(ret, **ser.data)
+
+            return Response(result, status.HTTP_200_OK)
+        except:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class PostView(APIView):
     """
