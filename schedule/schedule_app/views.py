@@ -165,7 +165,8 @@ class UserView(APIView):
             major = request._request.POST.get("major", None)
             grade = request._request.POST.get("grade", None)
             img = request.FILES['photo']
-            date = datetime.date.today().strftime("%Y%m/%d/")
+            password = request._request.POST.get("password", None)
+            date = datetime.date.today().strftime("%Y/%m/%d/")
             # 先创建头像
             photo = models.Photo(image=img)
             imageName = str(photo.image.name)
@@ -184,6 +185,7 @@ class UserView(APIView):
             user.major = major
             user.grade = grade
             user.photo = photo
+            user.password=password
             user.save()
 
             ret["code"] = 1000
