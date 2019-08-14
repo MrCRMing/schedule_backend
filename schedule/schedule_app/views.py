@@ -194,6 +194,22 @@ class UserView(APIView):
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def get(self, request, *args, **kwargs):  # 获得用户信息
+        ret = {"code": 1000, "msg": None}
+        try:
+            email = request._request.GET.get("email", None)
+
+            # 修改用户信息
+            user = models.Users.objects.get(pk=email)
+            ser = serializers.UserSerializers(instance=user, many=False)
+            ret["code"] = 1000
+            ret["msg"] = "获取用户信息成功"
+            result = dict(ret, **ser.data)
+
+            return Response(result, status.HTTP_200_OK)
+        except:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class PostView(APIView):
     """
@@ -321,6 +337,9 @@ class PostView(APIView):
                     "msg": "取消点赞成功",
                     "like_num": post.like_num
                 }
+
+            else:
+                return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
                 return Response(res,status.HTTP_200_OK)
 
@@ -501,6 +520,8 @@ class MessageView(APIView):
                         "msg": "该回复不存在"
                     }
                     return Response(res, status.HTTP_200_OK)
+            else:
+                return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -510,7 +531,7 @@ class LessonView(APIView):
     对课程的相关操作
     """
     def get(self, request, *args, **kwargs):  # 得到该用户的所有课程信息
-
+        try:
             email=request._request.GET.get("email",None)
             year = request.GET.get("year",None)
             semester = request.GET.get("semester",None)
@@ -545,6 +566,8 @@ class LessonView(APIView):
                 res["msg"] = "该用户尚未上传过课程"
                 return Response(res, status.HTTP_200_OK)
 
+        except:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self,request,*args,**kwargs): #添加新的课程信息
 
@@ -563,14 +586,16 @@ class LessonView(APIView):
             else:
                 print(3)
 
+            lesson_id_list = []
+            course_id_list = []
+
             for lesson_in_list in lesson_list:
                 course_name = lesson_in_list.get("course_name",None)
                 lesson = models.Lesson()
                 lesson.year = lesson_in_list.get("year", None)
                 lesson.semester = lesson_in_list.get("semester", None)
                 lesson.day_of_week = lesson_in_list.get("day_of_week", None)
-                lesson.week_begin = lesson_in_list.get("week_begin", None)
-                lesson.week_end = lesson_in_list.get("week_end", None)
+                lesson.week_num = lesson_in_list.get("week_num", None)
                 lesson.day_slot = lesson_in_list.get("day_slot", None)
                 lesson.teacher = lesson_in_list.get("teacher", None)
                 lesson.classroom = lesson_in_list.get("classroom", None)
@@ -591,19 +616,86 @@ class LessonView(APIView):
                 else:
                     lesson.course = course_obj
                     lesson.save()
-
+                lesson_id_list.append(lesson.id)
+                course_id_list.append(lesson.course_id)
             # 返回操作信息，暂不考虑将新添的lesson信息返回
 
             res = {
                 "code": 1000,
-                "msg": "上传成功"
+                "msg": "上传成功",
+                "lesson_id_list":lesson_id_list,
+                "course_id_list":course_id_list
+
             }
             return Response(res, status.HTTP_200_OK)
 
         except:
            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def delete(self, request, *args, **kwargs):# 根据id删除的课程信息
+    def put(self, request, *args, **kwargs):# 根据id删除的课程信息
+        try:
+            email = request.data.get("email", None)
+
+            lesson_id = request.data.get("lesson_id", None)
+            lesson = models.Lesson.objects.filter(pk=lesson_id).first()
+
+            if lesson != None:
+                if lesson.user_id == email:
+                    user = models.Users.objects.get(pk=email)
+                    universiy = user.university
+                    major = user.major
+                    course_name = request.data.get("course_name",models.Course.objects.get(pk=lesson.course_id).course_name)
+                    lesson.year = request.data.get("year", lesson.year)
+                    lesson.semester = request.data.get("semester", lesson.semester)
+                    lesson.day_of_week = request.data.get("day_of_week", lesson.day_of_week)
+                    lesson.week_num = request.data.get("week_num", lesson.week_num)
+                    lesson.day_slot = request.data.get("day_slot", lesson.day_slot)
+                    lesson.teacher = request.data.get("teacher", lesson.teacher)
+                    lesson.classroom = request.data.get("classroom", lesson.classroom)
+                    lesson.description = request.data.get("description", lesson.description)
+
+                    if course_name != models.Course.objects.get(pk=lesson.course_id).course_name:
+                        course_obj = models.Course.objects.filter(course_name=course_name, university=universiy,
+                                                                  major=major).first()
+                        if not course_obj:
+                            course = models.Course()
+                            course.course_name = course_name
+                            course.university = universiy
+                            course.major = major
+                            course.save()
+                            lesson.course = course
+                            lesson.save()
+                        else:
+                            lesson.course = course_obj
+                            lesson.save()
+                    else:
+                        lesson.save()
+                    res = {
+                        "code": 1000,
+                        "msg": "成功修改该课程",
+                        "course": serializers.LessonSerializers(instance=lesson, many=False).data
+                    }
+
+                    return Response(res, status.HTTP_200_OK)
+                else:
+                    res = {
+                        "code": 1002,
+                        "msg": "无权限，修改失败"
+                    }
+                    return Response(res, status.HTTP_200_OK)
+            else:
+                res = {
+                    "code": 1001,
+                    "msg": "该课程不存在"
+                }
+                return Response(res, status.HTTP_200_OK)
+
+        except:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+    def delete(self, request, *args, **kwargs):
         try:
             email = request.data.get("email", None)
 
@@ -631,12 +723,6 @@ class LessonView(APIView):
                 }
                 return Response(res, status.HTTP_200_OK)
 
-
-
         except:
-
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
 

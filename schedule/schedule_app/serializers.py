@@ -74,7 +74,7 @@ class LessonSerializers(serializers.Serializer):
     lesson_id = serializers.IntegerField(source="id")
     year = serializers.IntegerField()
     semester = serializers.IntegerField()
-    week_num = serializers.IntegerField()
+    week_num = serializers.CharField()
     day_of_week = serializers.IntegerField()
     day_slot = serializers.CharField()
     teacher = serializers.CharField()
