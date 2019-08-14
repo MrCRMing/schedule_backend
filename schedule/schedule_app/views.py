@@ -164,8 +164,9 @@ class UserView(APIView):
             university = request._request.POST.get("university", None)
             major = request._request.POST.get("major", None)
             grade = request._request.POST.get("grade", None)
+            password=request._request.POST.get("password",None)
             img = request.FILES['photo']
-            date = datetime.date.today().strftime("%Y%m/%d/")
+            date = datetime.date.today().strftime("%Y/%m/%d/")
             # 先创建头像
             photo = models.Photo(image=img)
             imageName = str(photo.image.name)
@@ -177,19 +178,36 @@ class UserView(APIView):
             photo.image.name = md5[:10] + extension
             photo.url = "http://" + settings.HOST + ":" + settings.PORT + "/media/photo/" + date + photo.image.name
             photo.save()
-            # 创建用户
+            # 修改用户信息
             user = models.Users.objects.get(pk=email)
             user.name =user_name
             user.university = university
             user.major = major
             user.grade = grade
             user.photo = photo
+            user.password=password
             user.save()
 
             ret["code"] = 1000
             ret["msg"] = "设置信息成功"
             ser=serializers.UserSerializers(instance=user,many=False)
             result=dict(ret,**ser.data)
+            return Response(result, status.HTTP_200_OK)
+        except:
+            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def get(self, request, *args, **kwargs):  # 获得用户信息
+        ret = {"code": 1000, "msg": None}
+        try:
+            email = request._request.GET.get("email", None)
+
+            # 修改用户信息
+            user = models.Users.objects.get(pk=email)
+            ser=serializers.UserSerializers(instance=user,many=False)
+            ret["code"] = 1000
+            ret["msg"] = "获取用户信息成功"
+            result=dict(ret,**ser.data)
+
             return Response(result, status.HTTP_200_OK)
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
