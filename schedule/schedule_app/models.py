@@ -55,11 +55,10 @@ class Lesson(models.Model):
     year = models.IntegerField(null=True)
     semester = models.IntegerField(null=True)
     week_num = models.CharField(max_length=64,null=True)
-
     day_of_week = models.IntegerField(null=True)
-    day_slot = models.CharField(max_length=20)
-    teacher = models.CharField(max_length=20)
-    classroom = models.CharField(max_length=20)
+    day_slot = models.CharField(max_length=20,null=True)
+    teacher = models.CharField(max_length=20,null=True)
+    classroom = models.CharField(max_length=20,null=True)
     description = models.CharField(max_length=128, null=True)
 
     # 指定外键
