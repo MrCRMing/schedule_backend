@@ -634,7 +634,7 @@ class LessonView(APIView):
         except:
            return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def put(self, request, *args, **kwargs):# 根据id删除的课程信息
+    def put(self, request, *args, **kwargs):# 根据id修改的课程信息
         try:
             email = request.data.get("email", None)
 
@@ -700,31 +700,51 @@ class LessonView(APIView):
     def delete(self, request, *args, **kwargs):
         try:
             email = request.data.get("email", None)
+            method = request.data.get("method", "id")
+            if method == "id":
+                lesson_id = request.data.get("lesson_id", None)
+                lesson = models.Lesson.objects.filter(pk=lesson_id).first()
 
-            lesson_id = request.data.get("lesson_id", None)
-            lesson = models.Lesson.objects.filter(pk=lesson_id).first()
-
-            if lesson != None:
-                if lesson.user_id == email:
-                    lesson.delete()
-                    res = {
-                        "code": 1000,
-                        "msg": "成功删除该课程"
-                    }
-                    return Response(res, status.HTTP_200_OK)
+                if lesson != None:
+                    if lesson.user_id == email:
+                        lesson.delete()
+                        res = {
+                            "code": 1000,
+                            "msg": "成功删除该课程"
+                        }
+                        return Response(res, status.HTTP_200_OK)
+                    else:
+                        res = {
+                            "code": 1002,
+                            "msg": "无权限，删除失败"
+                        }
+                        return Response(res, status.HTTP_200_OK)
                 else:
                     res = {
-                        "code": 1002,
-                        "msg": "无权限，删除失败"
+                        "code": 1001,
+                        "msg": "该课程不存在"
                     }
                     return Response(res, status.HTTP_200_OK)
-            else:
+            elif method == 'time':
+                year = request.data.get("year", None)
+                semester = request.data.get("semester",None)
+                lesson_list = models.Lesson.objects.filter(year=year,semester=semester,user_id=email)
+                count = lesson_list.count()
+                if count == 0:
+                    res = {
+                        "code": 1001,
+                        "msg": "此条件下无课程存在"
+                    }
+                    return Response(res, status.HTTP_200_OK)
+                lesson_list.delete()
                 res = {
-                    "code": 1001,
-                    "msg": "该课程不存在"
+                    "code": 1000,
+                    "count":count,
+                    "msg": "成功删除课程"
                 }
                 return Response(res, status.HTTP_200_OK)
-
+            else:
+                return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
         except:
             return Response(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
