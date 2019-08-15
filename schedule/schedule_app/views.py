@@ -110,6 +110,8 @@ class RegisterView(APIView):
             time_now = time_now - datetime.timedelta(hours=8)
 
             checkcode_obj = models.checkcode.objects.filter(email=email).first()
+            ret["time_early"] = time_early
+            ret["time_now"] = time_now
             if not checkcode_obj:
                 ret["code"] = 1003
                 ret["msg"] = "该邮箱未申请过验证码"
